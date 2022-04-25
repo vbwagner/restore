@@ -9,13 +9,15 @@ backups.
 
 1. Get an USB thumb drive or external HDD big enough to hold entire
    content of our notebook's SSD.
-2. Install gparted-live into beginning of this disk
+2. Install [gparted-live](https://gparted.org/livecd.php) into beginning of this disk
 3. Format rest of this disk (gparted would take no more than half of GB
 at the beginning) as ext4 system
-4. Install rsnapshot on your machine and set up it to make backup into
+4. Install [rsnapshot](https://rsnapshot.org/) on your machine and set up it to make backup into
    ```
    /media/${your name}/${label of your USB partition}/${hostname}
    ```
+   Or whereever your desktop enviroment mountes removable disks.
+
    If you have big usb HDD and several notebooks, you can backup all of
    them on one medium.
    You should backup everything including /boot/efi, although you can
@@ -25,6 +27,7 @@ at the beginning) as ext4 system
 5. Do first backup. Do:
    ```
    echo p |fdisk /dev/nvme0n1 > partitions.layout  
+   ```
 
    copy restore script into root of your backup partition.
 
@@ -53,16 +56,16 @@ anythin else:
 
 1. Repair the hardware
 2. Insert your backup drive in USB port and boot from it. Mount your
-   second partition under, say /mnt
+   second partition under, say `/mnt`
 3. From parted-live GUI create neccessary partitions. You can consult
    partitions.layout file which you have created while preparing backup.
-   Don't forget create vfat partion for /boot/efi, if you are using uefi
+   Don't forget create vfat partion for `/boot/efi`, if you are using uefi
    boot.
-4. Mount newly created root partition under, say /target
-   and if you unse separate partions for /home, /var or anything else,
-   mount them on /target/home, /target/var etc.
-   Don't forget to mount /target/boot/ef
-5. Cd to /mnt and run 
+4. Mount newly created root partition under, say `/target`
+   and if you unse separate partitions for `/home`, `/var` or anything else,
+   mount them on `/target/home`, `/target/var` etc.
+   Don't forget to mount `/target/boot/efi`
+5. Cd to `/mnt` and run 
     ```
     restore /target
 	```
@@ -83,5 +86,3 @@ SSD - no need to search for USB SATA or USB NVME controller to copy data
 from old disk. That is why we don't create partitions from script. User
 may want to rearrange partition layout or just restore system on bigger
 drive.
-
-
