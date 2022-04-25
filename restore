@@ -1,0 +1,109 @@
+#!/bin/sh
+
+if [ -z "$1" ] || [ "$1" = "--help" ]; then
+	cat >&2 << EOH
+Usage
+
+	$0 [backup-dir] restore-mount-point
+
+This is script to restore from rsnapshot-based backup.
+It copies directory tree from backup dir to restore-mount-point
+and updaes fstab there to have correct UUIDs of partitions mounted
+underneath this mountpoint. 
+
+You have to manually create partitions and filesystems on them and mount
+it under target mount point.
+EOH
+fi
+
+if [ -z "$2" ]; then
+	# only one parameter is specified it is assumed to be target. So in
+	# the current directory must be only one backup 
+	for candidate in alpha.0/etc "$(echo ./*/alpha.0/etc)"; do
+		if [ -d "$candidate" ]; then
+			backup="$(dirname "$candidate")"
+			break
+		fi
+	done
+	if [ -z "$backup" ]; then
+		echo "Cannot find backup directory. Please specify it explicitely" >&2
+		exit 1
+	fi
+	restore="$1"
+else
+	backup="$1"
+	restore="$2"
+fi
+
+
+if [ ! -d "$backup/etc" ]||[ ! -d "$backup/home" ]||[ ! -d "$backup/usr" ]; then
+	echo "$backup doesn't look like full backup of unix filesystem"
+fi
+
+if [ ! -d "$restore" ]; then
+	echo "Restore mount point $restore doesn't exists" >&2
+	exit 1
+fi
+tempf=$(mktemp)
+mount|while read -r dev _ point _ type rest; do
+	case $point in
+	$restore|$restore/*)
+		uuid="$(blkid "$dev" --output export|grep '^UUID')"
+		targetpoint=${point#$restore}
+		[ -z "$targetpoint" ]&&targetpoint=/
+		fsline=$(printf "%s %12s %s   defaults  0    0" "$uuid" "$targetpoint" "$type")
+		echo "$fsline">>"$tempf"
+	;;
+	*) 
+	:
+	;;
+	esac
+done
+# Scan for swap partitions on the same drive
+root="$(df "$restore" --output=source|tail -1)"
+drive="${root%[0-9]}"
+for part in "$drive"*; do
+	data="$(blkid "$part" --output=export)"
+	uuid=$(echo "$data"|grep "^UUID=")
+	if echo "$data"|grep -q TYPE=swap; then
+		echo "$uuid none         swap	  sw    1  0" >> "$tempf"
+	fi
+done
+while [ ! -e "$drive" ]; do
+	drive=${drive%?}
+done
+echo "Going to install boot loader on $drive"
+#read fstab and copy out all lines which do not start with UUID
+while read -r line; do
+	case "$line" in
+	UUID=*) 
+		if  [ -e "$tempf" ]; then
+		cat "$tempf"
+		rm "$tempf"
+		fi
+		;;
+	*)
+		echo "$line"
+		;;
+	esac
+done < "$backup/etc/fstab" > /tmp/fstab.new
+#  restoring backup
+echo "Restoring data"
+rsync -a "$backup/" "$restore/" || exit 1
+echo "Updatinf fstab"
+cp /tmp/fstab.new "$restore/etc/fstab"
+rm "$restore/etc/udev/rules.d"/*-persistent-net.rules
+echo "Installing bootloader"
+mount -t proc none "$restore/proc"
+mount -o bind /dev "$restore/dev"
+mount -t sysfs sys "$restore/sys"
+chroot "$restore" update-grub
+chroot "$restore" grub-install "$drive"
+umount "$restore/sys"
+umount "$restore/dev"
+umount "$restore/proc"
+
+echo "Restore completed. Please reboot"
+
+	
+
