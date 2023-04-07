@@ -1,0 +1,50 @@
+#!/bin/bash
+#
+# Intended to be called from file manager as aftermount command.
+# Checks if mounted volume looks like rsnapshot snapshot_root and if
+# so, asks to run backup in a graphical dialog.
+#
+# Expected backup script installed into BACKUP path below and
+# passwordless sudo available for it for any user of %plugdev group
+
+BACKUP=/usr/local/sbin/backup
+SUDOCMD=sudo
+spacefm_dialog() {
+	eval "$(spacefm -g --title "$1" --label "$2" --button no --button yes)"
+	[ "$dialog_pressed_label" = "yes" ]&& return 0
+	return 1
+}
+
+spacefm_monolog() {
+	spacefm -g --title "$1" --label "$2" --window-icon "$3" --button ok >/dev/null
+}
+
+zenity_dialog() {
+	zenity --question --title "$1" --text "$2"
+}
+
+zenity_monolog() {
+ 	zenity --$3 --title "$1" --text "$2"
+}
+mountpoint="$1"
+grep -q "^snapshot_root	$mountpoint" /etc/rsnapshot.conf || exit 0
+
+
+
+eval "$(df -H "$mountpoint"|awk 'NR>1 {printf "dev=%s\nsize=%s\nfree=%s\nmp=%s",$1,$2,$4,$6;}')"
+message="Backup media inserted into $dev\nTotal space $size\nFree space=$free\n. Would you like to start backup?"
+
+if command -v spacefm; then
+	iface=spacefm
+else
+	iface=zenity
+fi
+
+${iface}_dialog "Backup media inserted" "$message" || exit 0
+
+if sudo $BACKUP; then
+	${iface}_monolog "Backup successful" "Backup finished successfully" info
+else 
+	${iface}_monolog "Backup failed" "Backup finished with errors. See logs" error
+	exit 1
+fi

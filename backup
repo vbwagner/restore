@@ -1,0 +1,115 @@
+#!/usr/bin/perl
+# If we have rsnapshot, we have perl to run it
+
+=head1 NAME
+
+backup - manages multilevel rsnapshot backups
+
+=head1 SYNOPSIS
+
+    backup
+
+=head1 DESCRIPTION
+
+This script is intended to make B<rsnapshot>(1) backups to removable
+devices, which are performed by hand and with some irregularity.
+
+It reads C</etc/rsnapshot.conf> and finds out snapshot root and
+list of backup levels.
+
+It expected that removable device is automounted.
+
+It checks existing backups in the C<$snapshot_root>, and if oldest snapshot
+of level n is newer that next level was done (as determined by
+modification date of C<$snapshot_root/$level-stamp>) next level is
+performed.
+
+If all backups were successful, unmounts all partitions of device where
+C<$snapshot_root> is located.
+
+=head1 FILES
+
+/etc/rsnapshot.conf
+
+=head1 AUTHOR
+
+Victor Wagner <vitus@wagner.pp.ru>
+
+=cut
+
+# Read rsnapshot conf, find out snapshot_root and retain.
+open $conf, "<","/etc/rsnapshot.conf" or die "/etc/rsnapshot.conf:$!\n";
+my @levels=();
+my $snapshot_root=undef;
+LINE:
+while (<$conf>) {
+	if (/^snapshot_root\t+(.*)$/) {
+		$snapshot_root= $1;
+		next LINE;
+	}	
+	if (/^retain\s+(\w+)\s+(\d+)/) {
+		my $level = $1;
+		my $number = $2;
+		if (@levels) {
+			push @{$levels[$#levels]},$level;
+		}
+		push @levels,[$level,$number];
+	}
+}
+# last level is incomplete, we don't need it.
+pop @levels;
+
+die "No backup media mounted on $snapshot_root\n" unless -d $snapshot_root;
+# Now we have following triples:
+# "level,number,nextlevel"
+my $level;
+LEVEL:
+while (@levels) {
+	$triple = pop @levels;
+	$level=$triple->[0];
+	my $number=$triple->[1] -1;
+	my $nextlevel=$triple->[2];
+	if (! -d "$snapshot_root/$level.$number") {
+	    #not enough retained backups of on this level
+		next LEVEL;
+	}
+	if (-f "$snapshot_root/${nextlevel}-stamp" &&
+		-M "$snapshot_root/${nextlevel}-stamp" < 
+		-M "$snapshot_root/$level.$number") {
+	 	# last backup on level nextlevel happen after oldest retanined
+		# on level level
+		next LEVEL;
+	}
+    run_rsnapshot($nextlevel);
+	# touch stamp file
+	open my $stamp, ">+","$snapshot_root/${nextlevel}-stamp";
+	close $stamp;
+}
+run_rsnapshot($level);	
+# Размонтируем файловую систему, содержащую snapshot_root
+my @lines = `df $snapshot_root`;
+my @line = split(/\s+/,pop @lines);
+my $device = shift @line;
+$device =~ s/\d$//; # remove partition number 
+open my $mount,"mount|" or die "Cannot execute mount:$!";
+my @to_umount=();
+while (<$mount>) {
+	if (m!^($device\d) on !) {
+		push @to_umount,$1;
+	}
+}
+close $mount;
+for $device (@to_umount) {
+    print STDERR  "umount $device\n";
+ 	system("umount",$device);
+}
+
+sub run_rsnapshot {
+    my $level = shift;
+    print STDERR "running rsnapshot $level\n";
+    my $status= system("rsnapshot",$level) >> 8;
+    if ($status) { 
+        print STDERR "rnsapshot $level finished with code $status\n";
+        exit $status;
+    }
+}

@@ -1,0 +1,1 @@
+%plugdev	ALL=(ALL) NOPASSWD: /usr/local/sbin/backup
