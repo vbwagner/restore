@@ -82,7 +82,7 @@ while (@levels) {
 	}
     run_rsnapshot($nextlevel);
 	# touch stamp file
-	open my $stamp, ">+","$snapshot_root/${nextlevel}-stamp";
+	open my $stamp, ">>","$snapshot_root/${nextlevel}-stamp";
 	close $stamp;
 }
 run_rsnapshot($level);	
