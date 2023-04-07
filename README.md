@@ -35,10 +35,33 @@ Do backup regularly
 -------------------
 
 Don't forget to insert this USB drive into your notebook and run 
-rsnapshot with appropraite argument as root on regular basis.
+`rsnapshot` with appropriate argument as root on regular basis.
 
-Use alpha/beta/gamma modes of rsnapshots, so you'll store daily backups
+Use alpha/beta/gamma modes of `rsnapshot`, so you'll store daily backups
 for last week, weekly ones for last month and several monthly ones.
+
+Since backup to external drive requires human intervention anyway (pick
+drive from drawer and plug it into computer, and then return back), I
+don't expect myself to do backups every day. Why should I backup a
+notebook I haven't switched on since last backup?
+
+This set of scripts includes some scripts which simplify semiregular
+backups on removable drive. 
+
+1. **backup** - perl script which checks if there are enough backups on
+level alpha done and it's time to do next level beta backup.
+It reads `/etc/rsnapshot.conf` for `snapshot_root` and `retain`
+parameters. After successful backup it unmounts backup drive.
+
+2. **aftermount** - this script inteneded to be run by automounting
+system in your desktop session (tested with spacewm). It runs after
+removable disk is mounted and checks if this disk contains
+`snapshot_root`. If so, it displays dialog window asking you if you want
+to run backup. If yes, it starts **backup** using sudo.
+
+3. **backup.sudo** - place this file into `/etc/sudoers.d` so
+**aftermount** would be able to run **backup** as root without password.
+
 
 Restore old files occasionaly
 -----------------------------
@@ -47,22 +70,26 @@ Sometimes you'll find out that you have incedently removed or modified
 some file. You can than plug your backup drive in and get yesterday's or
 week ago copy.
 
+That is why **aftermount** script displays dialog requiring you to
+confirm start of backup. You may want to plug backup drive in just to
+dig out some files.
+
 When disaster happens
 ---------------------
 
 When your SSD drive dies, or have been irrepairable  wiped out,
 or hit by trojan or cryptolocker so it is easier to wipe out then do 
-anythin else:
+anything else:
 
 1. Repair the hardware
 2. Insert your backup drive in USB port and boot from it. Mount your
    second partition under, say `/mnt`
-3. From parted-live GUI create neccessary partitions. You can consult
+3. From parted-live GUI create necessary partitions. You can consult
    partitions.layout file which you have created while preparing backup.
-   Don't forget create vfat partion for `/boot/efi`, if you are using uefi
+   Don't forget create vfat partition for `/boot/efi`, if you are using UEFI
    boot.
 4. Mount newly created root partition under, say `/target`
-   and if you unse separate partitions for `/home`, `/var` or anything else,
+   and if you use separate partitions for `/home`, `/var` or anything else,
    mount them on `/target/home`, `/target/var` etc.
    Don't forget to mount `/target/boot/efi`
 5. Cd to `/mnt` and run 
