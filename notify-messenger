@@ -1,0 +1,8 @@
+#!/bin/sh
+# This and example of script called from backup script to notify 
+# sysadmin about backup status
+# This version sends message to default matrix room configured in root's
+# ~/.config/matrix-commander/credentials.json
+# You can use XMPP or some proprietary messenger such as telegram
+# instead
+matrix-commander -m -

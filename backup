@@ -27,15 +27,22 @@ performed.
 If all backups were successful, unmounts all partitions of device where
 C<$snapshot_root> is located.
 
+If there exists B</usr/local/sbin/notify-messenger> invokes it and
+sends messaage about backup completion status to its stdin
+
 =head1 FILES
 
 /etc/rsnapshot.conf
+
+/usr/local/sbin/notify-messenger
 
 =head1 AUTHOR
 
 Victor Wagner <vitus@wagner.pp.ru>
 
 =cut
+
+use Sys::Hostname;
 
 # Read rsnapshot conf, find out snapshot_root and retain.
 open $conf, "<","/etc/rsnapshot.conf" or die "/etc/rsnapshot.conf:$!\n";
@@ -86,6 +93,7 @@ while (@levels) {
 	close $stamp;
 }
 run_rsnapshot($level);	
+notify("Backup completed successfully\n");
 # Размонтируем файловую систему, содержащую snapshot_root
 my @lines = `df $snapshot_root`;
 my @line = split(/\s+/,pop @lines);
@@ -99,17 +107,34 @@ while (<$mount>) {
 	}
 }
 close $mount;
+my @baddevs=();
 for $device (@to_umount) {
     print STDERR  "umount $device\n";
- 	system("umount",$device);
+    if (system("umount",$device) !=0) {
+	push @baddevs, $device;
+    }
 }
 
+if (@baddevs) {
+  notify("Cannot unmount device(s) ".join(", ",@baddevs).".\n")
+}
 sub run_rsnapshot {
     my $level = shift;
     print STDERR "running rsnapshot $level\n";
     my $status= system("rsnapshot",$level) >> 8;
     if ($status) { 
-        print STDERR "rnsapshot $level finished with code $status\n";
+        notify("rsapshot $level finished with code $status\n");
         exit $status;
+    }
+}
+sub notify {
+    my $msg = shift;	
+    print STDERR $msg;	
+    my $notifier = "/usr/local/sbin/notify-messenger";
+    if ( -x $notifier) {
+     $hostname = Sys::Hostname::hostname();
+	 open my $pipe,"|",$notifier;
+	 print $pipe  "$hostname: $msg";
+	 close $pipe; 
     }
 }
