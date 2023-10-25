@@ -133,7 +133,7 @@ sub notify {
     my $notifier = "/usr/local/sbin/notify-messenger";
     if ( -x $notifier) {
      $hostname = Sys::Hostname::hostname();
-	 open my $pipe,"|",$notifier;
+	 open my $pipe,"|$notifier";
 	 print $pipe  "$hostname: $msg";
 	 close $pipe; 
     }

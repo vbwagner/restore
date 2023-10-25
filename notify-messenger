@@ -3,6 +3,8 @@
 # sysadmin about backup status
 # This version sends message to default matrix room configured in root's
 # ~/.config/matrix-commander/credentials.json
+# and expected that matrix-commander store is in th ${HOME}/store of 
+# invoking user(root)
 # You can use XMPP or some proprietary messenger such as telegram
 # instead
-matrix-commander -m -
+matrix-commander -m - -s ${HOME}/store
