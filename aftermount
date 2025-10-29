@@ -32,7 +32,11 @@ grep -q "^snapshot_root	$mountpoint" /etc/rsnapshot.conf || exit 0
 
 
 eval "$(df -H "$mountpoint"|awk 'NR>1 {printf "dev=%s\nsize=%s\nfree=%s\nmp=%s",$1,$2,$4,$6;}')"
-message="Backup media inserted into $dev\nTotal space $size\nFree space=$free\n. Would you like to start backup?"
+disk_id=""
+[ -f "$mountpoint/disk_id" ] && disk_id=$(cat "${mountpoint}/disk_id")
+
+message="Backup media ${disk_id} inserted into $dev\nTotal space $size\nFree space=$free\n. Would you like to start backup?"
+
 
 if command -v spacefm; then
 	iface=spacefm
@@ -40,10 +44,12 @@ else
 	iface=zenity
 fi
 
+
 ${iface}_dialog "Backup media inserted" "$message" || exit 0
 
+
 if sudo $BACKUP; then
-	${iface}_monolog "Backup successful" "Backup finished successfully" info
+	${iface}_monolog "Backup successful" "Backup to disk $disk_id finished successfully" info
 else 
 	${iface}_monolog "Backup failed" "Backup finished with errors. See logs" error
 	exit 1

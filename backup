@@ -69,6 +69,13 @@ pop @levels;
 die "No backup media mounted on $snapshot_root\n" unless -d $snapshot_root;
 # Now we have following triples:
 # "level,number,nextlevel"
+my ($device, $rootpath) = get_fs($snapshot_root);
+my $disk_id="";
+if ( -f "$rootpath/disk_id" ) {
+    open my $f,"<","$rootpath/disk_id";
+    $disk_id=<$f>;
+    chomp $disk_id;
+}
 my $level;
 LEVEL:
 while (@levels) {
@@ -92,12 +99,11 @@ while (@levels) {
 	open my $stamp, ">>","$snapshot_root/${nextlevel}-stamp";
 	close $stamp;
 }
+
 run_rsnapshot($level);	
-notify("Backup completed successfully\n");
+notify("Backup to disk $disk_id completed successfully\n");
 # Размонтируем файловую систему, содержащую snapshot_root
-my @lines = `df $snapshot_root`;
-my @line = split(/\s+/,pop @lines);
-my $device = shift @line;
+
 $device =~ s/\d$//; # remove partition number 
 open my $mount,"mount|" or die "Cannot execute mount:$!";
 my @to_umount=();
@@ -123,7 +129,7 @@ sub run_rsnapshot {
     print STDERR "running rsnapshot $level\n";
     my $status= system("rsnapshot",$level) >> 8;
     if ($status) { 
-        notify("rsapshot $level finished with code $status\n");
+        notify("rsapshot $level on disk $disk_id finished with code $status\n");
         exit $status;
     }
 }
@@ -138,3 +144,12 @@ sub notify {
 	 close $pipe; 
     }
 }
+
+sub get_fs {
+    # returns pair device, mountpoint for fs containing giv en path 
+    my $path = $_[0];
+    my @line = split(/\s+/, (`df $path`)[1]);
+    return (shift @line, pop @line);
+}
+
+
