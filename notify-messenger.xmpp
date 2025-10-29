@@ -1,0 +1,9 @@
+#!/bin/sh
+# This and example of script called from backup script to notify 
+# sysadmin about backup status
+# This version sends message to specified xmpp account as user,
+# configured in root's
+# ~/.config/xmppc.conf
+# should be renamed to just notify-messenger to use.
+read -r message
+xmppc -m message chat vitus@wagner.pp.ru "$message"
